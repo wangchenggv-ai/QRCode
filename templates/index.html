@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}镜片溯源验证系统{% endblock %}
+{% block content %}
+<div class="verify-card">
+  <div class="brand-logo">&#128065;</div>
+  <h1 class="brand-title">镜片溯源验证系统</h1>
+  <p class="brand-desc">请使用微信扫描镜片上的二维码，即可验证产品真伪及查看处方参数。</p>
+  <hr class="divider">
+  <p class="admin-link-hint">
+    <a href="{{ url_for('admin_login') }}">管理员入口</a>
+  </p>
+</div>
+{% endblock %}

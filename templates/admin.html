@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}管理后台{% endblock %}
+{% block content %}
+<div class="admin-panel">
+  <div class="admin-header">
+    <h1>管理后台</h1>
+    <a href="{{ url_for('admin_logout') }}" class="btn btn-sm">退出登录</a>
+  </div>
+
+  <!-- Upload -->
+  <section class="card">
+    <h2>上传订单 Excel</h2>
+    <p class="hint">Excel 第一行必须包含以下列名：订单号、客户姓名、左眼球镜、左眼柱镜、右眼球镜、右眼柱镜、生产日期、备注</p>
+    <form method="post" action="{{ url_for('admin_upload') }}"
+          enctype="multipart/form-data" class="upload-form">
+      <input type="file" name="excel_file" accept=".xlsx,.xls" required>
+      <button type="submit" class="btn btn-primary">上传</button>
+    </form>
+  </section>
+
+  <!-- Batch QR -->
+  <section class="card">
+    <h2>批量生成二维码</h2>
+    <p>当前共 <strong>{{ orders|length }}</strong> 条订单</p>
+    {% if orders %}
+    <a href="{{ url_for('generate_all_qr') }}" class="btn btn-primary">
+      下载全部二维码 (ZIP)
+    </a>
+    {% endif %}
+  </section>
+
+  <!-- Order list -->
+  <section class="card">
+    <h2>订单列表</h2>
+    {% if orders %}
+    <div class="table-scroll">
+      <table class="order-table">
+        <thead>
+          <tr>
+            <th>订单号</th>
+            <th>客户姓名</th>
+            <th>生产日期</th>
+            <th>操作</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for oid, order in orders.items() %}
+          <tr>
+            <td>{{ order.order_id }}</td>
+            <td>{{ order.customer_name }}</td>
+            <td>{{ order.production_date }}</td>
+            <td class="actions">
+              <a href="{{ url_for('generate_single_qr', order_id=oid) }}"
+                 class="btn btn-sm">下载二维码</a>
+              <a href="{{ url_for('verify', order_id=oid) }}"
+                 target="_blank" class="btn btn-sm">预览</a>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="empty-hint">暂无订单，请先上传 Excel 文件。</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

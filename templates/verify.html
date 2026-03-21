@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}镜片真伪验证{% endblock %}
+{% block content %}
+
+{% if found %}
+<div class="verify-card">
+  <div class="badge authentic-badge">&#10003; 正品认证</div>
+
+  <div class="info-section">
+    <div class="info-row">
+      <span class="label">订单号</span>
+      <span class="value">{{ order.order_id }}</span>
+    </div>
+    <div class="info-row">
+      <span class="label">客户姓名</span>
+      <span class="value">{{ order.customer_name }}</span>
+    </div>
+    {% if order.production_date %}
+    <div class="info-row">
+      <span class="label">生产日期</span>
+      <span class="value">{{ order.production_date }}</span>
+    </div>
+    {% endif %}
+  </div>
+
+  <h2 class="section-title">处方参数</h2>
+  <table class="rx-table">
+    <thead>
+      <tr>
+        <th></th>
+        <th>球镜 SPH</th>
+        <th>柱镜 CYL</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="eye-label">左眼 L</td>
+        <td>{{ order.left_sph if order.left_sph else '—' }}</td>
+        <td>{{ order.left_cyl if order.left_cyl else '—' }}</td>
+      </tr>
+      <tr>
+        <td class="eye-label">右眼 R</td>
+        <td>{{ order.right_sph if order.right_sph else '—' }}</td>
+        <td>{{ order.right_cyl if order.right_cyl else '—' }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  {% if order.notes %}
+  <div class="notes">备注：{{ order.notes }}</div>
+  {% endif %}
+
+  <p class="verify-time">验证时间：{{ now }}</p>
+</div>
+
+{% else %}
+<div class="verify-card not-found-card">
+  <div class="badge not-found-badge">&#10007; 未找到记录</div>
+  <h1 class="not-found-title">无法验证</h1>
+  <p class="not-found-desc">
+    订单号 <strong>{{ order_id }}</strong> 未在系统中找到。
+  </p>
+  <p class="not-found-desc">请联系销售商确认产品真伪。</p>
+</div>
+{% endif %}
+
+{% endblock %}
