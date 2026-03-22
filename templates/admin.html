@@ -10,7 +10,10 @@
   <!-- Upload -->
   <section class="card">
     <h2>上传订单 Excel</h2>
-    <p class="hint">Excel 第一行必须包含以下列名：订单号、客户姓名、左眼球镜、左眼柱镜、右眼球镜、右眼柱镜、生产日期、备注</p>
+    <p class="hint">
+      Excel 第一行列名：订单号、客户姓名、左眼球镜、左眼柱镜、右眼球镜、右眼柱镜、生产日期、备注<br>
+      <strong>镜片码</strong>列可留空，上传后系统自动生成唯一防伪码并写回 Excel。
+    </p>
     <form method="post" action="{{ url_for('admin_upload') }}"
           enctype="multipart/form-data" class="upload-form">
       <input type="file" name="excel_file" accept=".xlsx,.xls" required>
@@ -21,7 +24,7 @@
   <!-- Batch QR -->
   <section class="card">
     <h2>批量生成二维码</h2>
-    <p>当前共 <strong>{{ orders|length }}</strong> 条订单</p>
+    <p>当前共 <strong>{{ orders|length }}</strong> 条订单，每条订单一个唯一二维码。</p>
     {% if orders %}
     <a href="{{ url_for('generate_all_qr') }}" class="btn btn-primary">
       下载全部二维码 (ZIP)
@@ -40,6 +43,7 @@
             <th>订单号</th>
             <th>客户姓名</th>
             <th>生产日期</th>
+            <th>镜片码</th>
             <th>操作</th>
           </tr>
         </thead>
@@ -49,11 +53,16 @@
             <td>{{ order.order_id }}</td>
             <td>{{ order.customer_name }}</td>
             <td>{{ order.production_date }}</td>
+            <td class="qr-code-cell">{{ order.qr_code or '—' }}</td>
             <td class="actions">
+              {% if order.qr_code %}
               <a href="{{ url_for('generate_single_qr', order_id=oid) }}"
                  class="btn btn-sm">下载二维码</a>
-              <a href="{{ url_for('verify', order_id=oid) }}"
+              <a href="{{ url_for('verify', qr_code=order.qr_code) }}"
                  target="_blank" class="btn btn-sm">预览</a>
+              {% else %}
+              <span class="empty-hint">无镜片码</span>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}

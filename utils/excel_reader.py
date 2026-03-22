@@ -1,5 +1,6 @@
 import os
 import sys
+import uuid
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import openpyxl
@@ -15,9 +16,13 @@ COLUMN_MAP = {
     "right_cyl":       "右眼柱镜",
     "production_date": "生产日期",
     "notes":           "备注",
+    # Unique anti-counterfeiting code — auto-generated if blank, written back to Excel
+    "qr_code":         "镜片码",
 }
 
-_cache = {"mtime": None, "data": {}}
+# _cache["data"]     → {order_id: order_dict}
+# _cache["qr_index"] → {qr_code: order_id}
+_cache = {"mtime": None, "data": {}, "qr_index": {}}
 
 
 def _get_mtime():
@@ -40,10 +45,7 @@ def _format_optical(val) -> str:
 
 
 def load_orders() -> dict:
-    """
-    Returns dict {order_id: order_dict}.
-    Uses file mtime to invalidate in-memory cache automatically.
-    """
+    """Returns dict {order_id: order_dict}. Invalidates cache by file mtime."""
     mtime = _get_mtime()
     if mtime is not None and mtime == _cache["mtime"]:
         return _cache["data"]
@@ -54,15 +56,15 @@ def load_orders() -> dict:
     wb = openpyxl.load_workbook(Config.EXCEL_PATH, read_only=True, data_only=True)
     ws = wb.active
 
-    # Build column-index → internal-key mapping from header row
     headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
     reverse_map = {v: k for k, v in COLUMN_MAP.items()}
-    col_index = {}  # internal_key → 0-based index
+    col_index = {}
     for idx, header in enumerate(headers):
         if header in reverse_map:
             col_index[reverse_map[header]] = idx
 
     orders = {}
+    qr_index = {}
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not any(row):
             continue
@@ -74,16 +76,71 @@ def load_orders() -> dict:
             elif key == "production_date" and hasattr(val, "strftime"):
                 order[key] = val.strftime("%Y-%m-%d")
             else:
-                order[key] = str(val) if val is not None else ""
+                order[key] = str(val).strip() if val is not None else ""
+
         oid = order.get("order_id", "").strip()
-        if oid:
-            orders[oid] = order
+        if not oid:
+            continue
+        orders[oid] = order
+
+        qc = order.get("qr_code", "")
+        if qc:
+            qr_index[qc] = oid
 
     wb.close()
     _cache["mtime"] = mtime
     _cache["data"] = orders
+    _cache["qr_index"] = qr_index
     return orders
 
 
-def get_order(order_id: str) -> dict | None:
-    return load_orders().get(str(order_id).strip())
+def get_order_by_qr(qr_code: str) -> dict | None:
+    """Look up an order by its unique QR code (镜片码)."""
+    load_orders()
+    oid = _cache["qr_index"].get(str(qr_code).strip())
+    if oid is None:
+        return None
+    return _cache["data"].get(oid)
+
+
+def assign_qr_codes() -> int:
+    """
+    Opens the Excel file, assigns a unique 镜片码 to any row that lacks one,
+    saves the file, and invalidates the cache.
+    Returns the number of new codes written.
+    """
+    if not os.path.exists(Config.EXCEL_PATH):
+        return 0
+
+    wb = openpyxl.load_workbook(Config.EXCEL_PATH, data_only=True)
+    ws = wb.active
+
+    headers = [cell.value for cell in next(ws.iter_rows(min_row=1, max_row=1))]
+
+    # Find or append the 镜片码 column
+    qr_col = None
+    for idx, h in enumerate(headers, start=1):
+        if h == "镜片码":
+            qr_col = idx
+            break
+    if qr_col is None:
+        qr_col = len(headers) + 1
+        ws.cell(row=1, column=qr_col, value="镜片码")
+
+    # Find the 订单号 column to detect blank rows
+    order_id_col = next((i + 1 for i, h in enumerate(headers) if h == "订单号"), None)
+
+    written = 0
+    for row_idx in range(2, ws.max_row + 1):
+        if order_id_col and not ws.cell(row=row_idx, column=order_id_col).value:
+            continue
+        cell = ws.cell(row=row_idx, column=qr_col)
+        if not cell.value:
+            # 16-char uppercase hex — unique, hard to guess, URL-safe
+            cell.value = uuid.uuid4().hex[:16].upper()
+            written += 1
+
+    wb.save(Config.EXCEL_PATH)
+    wb.close()
+    _cache["mtime"] = None  # invalidate cache
+    return written

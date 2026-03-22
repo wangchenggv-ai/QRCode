@@ -7,17 +7,14 @@ from flask import (
     request, session, send_file, flash, abort,
 )
 from config import Config
-from utils.excel_reader import load_orders, get_order
-from utils.qr_generator import generate_qr_png, generate_zip
+from utils.excel_reader import load_orders, get_order_by_qr, assign_qr_codes
+from utils.qr_generator import generate_qr_png, generate_all_zip
 
 app = Flask(__name__)
 app.secret_key = Config.SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = Config.MAX_CONTENT_LENGTH
 
 
-# ---------------------------------------------------------------------------
-# Template context
-# ---------------------------------------------------------------------------
 @app.context_processor
 def inject_now():
     return {"now": datetime.now().strftime("%Y-%m-%d %H:%M")}
@@ -43,11 +40,11 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/verify/<order_id>")
-def verify(order_id):
-    order = get_order(order_id)
+@app.route("/verify/<qr_code>")
+def verify(qr_code):
+    order = get_order_by_qr(qr_code)
     if order is None:
-        return render_template("verify.html", found=False, order_id=order_id), 404
+        return render_template("verify.html", found=False, qr_code=qr_code), 404
     return render_template("verify.html", found=True, order=order)
 
 
@@ -98,7 +95,14 @@ def admin_upload():
 
     os.makedirs(Config.DATA_DIR, exist_ok=True)
     f.save(Config.EXCEL_PATH)
-    flash(f"Excel 上传成功，共载入 {len(load_orders())} 条订单", "success")
+
+    # Auto-assign unique codes to any new orders that lack one
+    new_codes = assign_qr_codes()
+    orders = load_orders()
+    msg = f"上传成功，共 {len(orders)} 条订单"
+    if new_codes:
+        msg += f"，为 {new_codes} 条新订单生成了镜片码"
+    flash(msg, "success")
     return redirect(url_for("admin_dashboard"))
 
 
@@ -108,9 +112,11 @@ def admin_upload():
 @app.route("/admin/generate_qr/<order_id>")
 @admin_required
 def generate_single_qr(order_id):
-    if get_order(order_id) is None:
+    orders = load_orders()
+    order = orders.get(order_id)
+    if order is None or not order.get("qr_code"):
         abort(404)
-    png = generate_qr_png(order_id, save_to_disk=True)
+    png = generate_qr_png(order["qr_code"], label=order_id, save_to_disk=True)
     return send_file(
         io.BytesIO(png),
         mimetype="image/png",
@@ -126,7 +132,7 @@ def generate_all_qr():
     if not orders:
         flash("没有订单数据，请先上传 Excel", "error")
         return redirect(url_for("admin_dashboard"))
-    zip_bytes = generate_zip(list(orders.keys()))
+    zip_bytes = generate_all_zip(orders)
     return send_file(
         io.BytesIO(zip_bytes),
         mimetype="application/zip",

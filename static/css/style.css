@@ -122,11 +122,25 @@ body {
   border-radius: 8px;
 }
 
+.qr-code-display {
+  color: #bbb;
+  font-size: 11px;
+  font-family: monospace;
+  margin-top: 14px;
+  letter-spacing: 0.5px;
+}
+
 .verify-time {
   color: #bbb;
   font-size: 12px;
-  margin-top: 16px;
+  margin-top: 4px;
   text-align: right;
+}
+
+.qr-code-cell {
+  font-family: monospace;
+  font-size: 12px;
+  color: #888;
 }
 
 /* Not found */
