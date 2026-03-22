@@ -15,6 +15,27 @@ app = Flask(__name__)
 app.secret_key = Config.SECRET_KEY
 app.config["MAX_CONTENT_LENGTH"] = Config.MAX_CONTENT_LENGTH
 
+# Auto-create sample Excel on first run so the app works out of the box
+def _init_sample_data():
+    if os.path.exists(Config.EXCEL_PATH):
+        return
+    try:
+        import openpyxl
+        from datetime import date
+        os.makedirs(Config.DATA_DIR, exist_ok=True)
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.append(["订单号","客户姓名","左眼球镜","左眼柱镜","右眼球镜","右眼柱镜","生产日期","备注"])
+        ws.append(["ORD001","张三","+1.00","-0.75","+1.25","-0.50",date(2026,1,15),"渐进镜"])
+        ws.append(["ORD002","李四","-2.50","-1.00","-2.75","-0.75",date(2026,1,20),""])
+        ws.append(["ORD003","王五","0.00","-0.25","+0.25","0.00",date(2026,2,3),"单光镜"])
+        wb.save(Config.EXCEL_PATH)
+        assign_qr_codes()
+    except Exception:
+        pass
+
+_init_sample_data()
+
 
 @app.context_processor
 def inject_now():
