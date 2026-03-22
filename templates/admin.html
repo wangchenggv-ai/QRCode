@@ -114,6 +114,9 @@
     </div>
     {% else %}
     <p class="empty-hint">暂无订单，请先上传 Excel 文件。</p>
+    <form method="post" action="{{ url_for('admin_load_sample') }}" style="margin-top:1rem;text-align:center">
+      <button type="submit" class="btn" style="background:#6c757d;color:#fff">加载示例数据（5 条）</button>
+    </form>
     {% endif %}
   </section>
 </div>

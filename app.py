@@ -100,6 +100,30 @@ def admin_dashboard():
 
 
 # ---------------------------------------------------------------------------
+# Admin: load sample data
+# ---------------------------------------------------------------------------
+@app.route("/admin/load-sample", methods=["POST"])
+@admin_required
+def admin_load_sample():
+    import openpyxl
+    from datetime import date
+    os.makedirs(Config.DATA_DIR, exist_ok=True)
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(["订单号", "客户姓名", "左眼球镜", "左眼柱镜", "右眼球镜", "右眼柱镜", "生产日期", "备注"])
+    ws.append(["ORD001", "张三", "+1.00", "-0.75", "+1.25", "-0.50", date(2026, 1, 15), "渐进镜"])
+    ws.append(["ORD002", "李四", "-2.50", "-1.00", "-2.75", "-0.75", date(2026, 1, 20), ""])
+    ws.append(["ORD003", "王五", "0.00", "-0.25", "+0.25", "0.00", date(2026, 2, 3), "单光镜"])
+    ws.append(["ORD004", "赵六", "-1.25", "-0.50", "-1.00", "-0.25", date(2026, 2, 10), ""])
+    ws.append(["ORD005", "陈七", "+2.00", "0.00", "+1.75", "-0.25", date(2026, 3, 1), "双光镜"])
+    wb.save(Config.EXCEL_PATH)
+    assign_qr_codes()
+    orders = load_orders()
+    flash(f"示例数据已加载，共 {len(orders)} 条订单", "success")
+    return redirect(url_for("admin_dashboard"))
+
+
+# ---------------------------------------------------------------------------
 # Admin: upload Excel
 # ---------------------------------------------------------------------------
 @app.route("/admin/upload", methods=["POST"])
