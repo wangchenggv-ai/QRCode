@@ -1,0 +1,13 @@
+services:
+  web:
+    build: .
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./data:/app/data          # Excel 文件持久化
+      - ./static/qrcodes:/app/static/qrcodes  # 生成的二维码持久化
+    environment:
+      - ADMIN_PASSWORD=admin123
+      - SECRET_KEY=change-me-in-production
+      - SERVER_BASE_URL=http://localhost:5000
+    restart: unless-stopped
