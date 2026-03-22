@@ -9,6 +9,7 @@ from flask import (
 from config import Config
 from utils.excel_reader import load_orders, get_order_by_qr, assign_qr_codes
 from utils.qr_generator import generate_qr_png, generate_all_zip
+from utils.label_generator import generate_factory_zip
 
 app = Flask(__name__)
 app.secret_key = Config.SECRET_KEY
@@ -138,6 +139,27 @@ def generate_all_qr():
         mimetype="application/zip",
         as_attachment=True,
         download_name="all_qrcodes.zip",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Admin: factory export package
+# ---------------------------------------------------------------------------
+@app.route("/admin/factory_export")
+@admin_required
+def factory_export():
+    # Ensure all orders have a QR code assigned before exporting
+    assign_qr_codes()
+    orders = load_orders()
+    if not orders:
+        flash("没有订单数据，请先上传 Excel", "error")
+        return redirect(url_for("admin_dashboard"))
+    zip_bytes = generate_factory_zip(orders, Config.EXCEL_PATH)
+    return send_file(
+        io.BytesIO(zip_bytes),
+        mimetype="application/zip",
+        as_attachment=True,
+        download_name="factory_package.zip",
     )
 
 

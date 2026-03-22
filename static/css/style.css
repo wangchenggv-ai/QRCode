@@ -328,3 +328,92 @@ body {
   text-align: center;
   padding: 20px 0;
 }
+
+/* ─── Workflow banner ────────────────────────────────────────────────────── */
+.workflow-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  border-radius: 12px;
+  padding: 14px 10px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.06);
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.workflow-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 64px;
+}
+.step-num {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: #07c160;
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-text {
+  font-size: 11px;
+  color: #555;
+  text-align: center;
+}
+.workflow-arrow {
+  color: #ccc;
+  font-size: 20px;
+  padding: 0 4px;
+  margin-bottom: 14px;
+}
+
+/* ─── Factory card ───────────────────────────────────────────────────────── */
+.factory-card {
+  border: 2px solid #07c160;
+}
+.factory-contents {
+  list-style: none;
+  margin: 10px 0 16px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.factory-contents li {
+  font-size: 13px;
+  color: #555;
+  padding-left: 14px;
+  position: relative;
+}
+.factory-contents li::before {
+  content: "▸";
+  position: absolute;
+  left: 0;
+  color: #07c160;
+}
+.btn-factory {
+  display: block;
+  background: #07c160;
+  color: #fff;
+  border-color: #07c160;
+  text-align: center;
+  padding: 14px 20px;
+  font-size: 16px;
+  font-weight: 600;
+  border-radius: 10px;
+  text-decoration: none;
+}
+.btn-factory:active { opacity: 0.8; }
+
+/* ─── Table rx cells ─────────────────────────────────────────────────────── */
+.rx-cell {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #444;
+}
