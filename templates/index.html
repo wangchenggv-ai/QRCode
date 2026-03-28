@@ -1,13 +1,27 @@
 {% extends "base.html" %}
-{% block title %}镜片溯源验证系统{% endblock %}
+{% block title %}高视星 - 镜片溯源验证系统{% endblock %}
 {% block content %}
-<div class="verify-card">
-  <div class="brand-logo">&#128065;</div>
-  <h1 class="brand-title">镜片溯源验证系统</h1>
-  <p class="brand-desc">请使用微信扫描镜片上的二维码，即可验证产品真伪及查看处方参数。</p>
-  <hr class="divider">
-  <p class="admin-link-hint">
-    <a href="{{ url_for('admin_login') }}">管理员入口</a>
-  </p>
+<div class="v-page">
+  <div class="v-hero" style="border-radius: 20px; margin-top: 40px; padding: 48px 20px 40px;">
+    <div class="v-brand">
+      <span class="v-brand-gaush">GAUSH</span>
+      <span class="v-brand-sep">|</span>
+      <span class="v-brand-clear">CLEAR</span>
+    </div>
+    <div class="v-shield" style="width:64px;height:64px;margin-bottom:18px;">
+      <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="4"/>
+        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/>
+      </svg>
+    </div>
+    <p class="v-product-name" style="font-size:24px;letter-spacing:6px;margin-bottom:12px;">高视星</p>
+    <h1 class="v-status" style="font-size:17px;font-weight:500;letter-spacing:1px;margin-bottom:8px;">镜片溯源验证系统</h1>
+    <p class="v-status-sub">请使用微信扫描镜片上的二维码<br>即可验证产品真伪及查看处方参数</p>
+    <div class="v-glow"></div>
+  </div>
+  <div class="v-footer" style="margin-top:24px;">
+    <p class="v-footer-brand">GAUSH | CLEAR</p>
+    <p style="margin-top:12px;"><a href="{{ url_for('admin_login') }}" style="color:#6c5ce7;text-decoration:none;font-size:13px;">管理员入口</a></p>
+  </div>
 </div>
 {% endblock %}

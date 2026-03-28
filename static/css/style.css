@@ -31,127 +31,215 @@ body {
 .alert-success { background: #e6f9ee; color: #1a7a3a; }
 .alert-error   { background: #fdecea; color: #c0392b; }
 
-/* ─── Verify card ───────────────────────────────────────────────────────── */
-.verify-card {
-  background: #fff;
-  border-radius: 16px;
-  padding: 28px 20px;
-  margin-top: 16px;
-  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+/* ─── Verify page (v3 — Gaush Clear brand) ─────────────────────────────── */
+.v-page {
+  padding-top: 0;
 }
 
-.not-found-card {
+/* Hero section */
+.v-hero {
   text-align: center;
+  padding: 32px 20px 36px;
+  background: linear-gradient(160deg, #0a1a3a 0%, #1e3a6e 40%, #4a3a8e 70%, #6c5ce7 100%);
+  border-radius: 0 0 28px 28px;
+  margin: -16px -16px 20px -16px;
+  position: relative;
+  overflow: hidden;
+}
+.v-hero-fail {
+  background: linear-gradient(160deg, #1a0a0a 0%, #5a1a2a 40%, #8a2a3a 100%);
 }
 
-/* Badge */
-.badge {
-  display: inline-block;
-  padding: 8px 22px;
-  border-radius: 24px;
-  font-size: 17px;
+/* Decorative glow */
+.v-glow {
+  position: absolute;
+  top: 20%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, rgba(160,106,255,0.2) 0%, rgba(74,142,255,0.1) 40%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Brand logo text */
+.v-brand {
+  margin-bottom: 20px;
+  font-size: 13px;
+  letter-spacing: 2px;
+  position: relative;
+  z-index: 1;
+}
+.v-brand-gaush {
+  color: #fff;
   font-weight: 700;
-  margin-bottom: 20px;
 }
-.authentic-badge {
-  background: #e6f9ee;
-  color: #1a7a3a;
-  border: 2px solid #1a7a3a;
+.v-brand-sep {
+  color: rgba(255,255,255,0.3);
+  margin: 0 6px;
 }
-.not-found-badge {
-  background: #fdecea;
-  color: #c0392b;
-  border: 2px solid #c0392b;
+.v-brand-clear {
+  color: rgba(255,255,255,0.9);
+  font-weight: 400;
+  font-size: 12px;
+  letter-spacing: 3px;
 }
 
-/* Info rows */
-.info-section {
-  margin-bottom: 20px;
+.v-shield {
+  width: 76px;
+  height: 76px;
+  margin: 0 auto 14px;
+  background: linear-gradient(135deg, rgba(74,142,255,0.3) 0%, rgba(108,92,231,0.3) 100%);
+  border: 2px solid rgba(255,255,255,0.15);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(6px);
+  position: relative;
+  z-index: 1;
 }
-.info-row {
+.v-status {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: 2px;
+  position: relative;
+  z-index: 1;
+}
+.v-product-name {
+  color: #a06aff;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  margin-bottom: 8px;
+  position: relative;
+  z-index: 1;
+}
+.v-status-sub {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 13px;
+  line-height: 1.6;
+  position: relative;
+  z-index: 1;
+}
+
+/* Info card */
+.v-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 18px 20px;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 16px rgba(10, 26, 58, 0.08);
+  border: 1px solid rgba(108,92,231,0.06);
+}
+.v-card-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1e3a6e;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #f0f0f5;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.v-card-title-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.v-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 10px 0;
-  border-bottom: 1px solid #f0f0f0;
+  padding: 11px 0;
+  border-bottom: 1px solid #f5f5f8;
 }
-.info-row:last-child { border-bottom: none; }
-.label { color: #888; font-size: 14px; }
-.value { font-weight: 600; font-size: 15px; }
-
-/* Section title */
-.section-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #555;
-  margin-bottom: 10px;
+.v-row:last-child { border-bottom: none; }
+.v-label {
+  color: #999;
+  font-size: 14px;
+  flex-shrink: 0;
 }
-
-/* Prescription table */
-.rx-table {
-  width: 100%;
-  border-collapse: collapse;
-  margin-bottom: 16px;
-}
-.rx-table th,
-.rx-table td {
-  padding: 13px 8px;
-  text-align: center;
-  border: 1px solid #e8e8e8;
+.v-val {
   font-size: 15px;
-}
-.rx-table th {
-  background: #fafafa;
-  font-weight: 600;
-  font-size: 13px;
-  color: #666;
-}
-.rx-table tr:nth-child(even) { background: #fafcff; }
-.eye-label {
-  font-weight: 700;
-  color: #444;
-  font-size: 14px;
-}
-
-.notes {
-  color: #666;
-  font-size: 14px;
-  margin-top: 12px;
-  padding: 10px;
-  background: #f8f8f8;
-  border-radius: 8px;
-}
-
-.qr-code-display {
-  color: #bbb;
-  font-size: 11px;
-  font-family: monospace;
-  margin-top: 14px;
-  letter-spacing: 0.5px;
-}
-
-.verify-time {
-  color: #bbb;
-  font-size: 12px;
-  margin-top: 4px;
+  color: #1e3a6e;
   text-align: right;
 }
+.v-val-bold { font-weight: 700; color: #0a1a3a; }
 
+/* Prescription grid */
+.v-rx {
+  display: flex;
+  flex-direction: column;
+}
+.v-rx-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  text-align: center;
+  padding: 8px 0;
+  font-size: 12px;
+  color: #aaa;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+.v-rx-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  text-align: center;
+  padding: 14px 0;
+  border-top: 1px solid #f0f0f5;
+  align-items: center;
+}
+.v-eye-tag {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  justify-self: center;
+}
+.v-eye-L {
+  background: linear-gradient(135deg, #eef2ff, #e8eeff);
+  color: #4a8eff;
+}
+.v-eye-R {
+  background: linear-gradient(135deg, #f3eeff, #ede6ff);
+  color: #6c5ce7;
+}
+.v-rx-num {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0a1a3a;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Footer meta */
+.v-footer {
+  text-align: center;
+  padding: 18px 0 8px;
+  color: #bbb;
+  font-size: 12px;
+}
+.v-footer p { margin-bottom: 3px; }
+.v-mono {
+  font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
+  letter-spacing: 1px;
+}
+.v-footer-brand {
+  margin-top: 10px !important;
+  color: #999;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+
+/* Legacy */
 .qr-code-cell {
   font-family: monospace;
   font-size: 12px;
   color: #888;
-}
-
-/* Not found */
-.not-found-title {
-  font-size: 20px;
-  margin-bottom: 12px;
-}
-.not-found-desc {
-  color: #666;
-  font-size: 15px;
-  margin-bottom: 8px;
 }
 
 /* ─── Brand / index ─────────────────────────────────────────────────────── */

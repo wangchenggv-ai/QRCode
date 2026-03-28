@@ -12,7 +12,7 @@ class Config:
     QR_DIR = os.path.join(BASE_DIR, "static", "qrcodes")
 
     # Server — set SERVER_BASE_URL to your public domain in production
-    SERVER_BASE_URL = os.environ.get("SERVER_BASE_URL", "http://localhost:5000")
+    SERVER_BASE_URL = os.environ.get("SERVER_BASE_URL", "http://192.168.1.29:5000")
 
     # QR code appearance
     QR_BOX_SIZE = 10   # pixels per QR module

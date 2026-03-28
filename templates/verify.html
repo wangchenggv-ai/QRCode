@@ -1,64 +1,110 @@
 {% extends "base.html" %}
-{% block title %}镜片真伪验证{% endblock %}
+{% block title %}高视星 - 镜片真伪验证{% endblock %}
 {% block content %}
 
 {% if found %}
-<div class="verify-card">
-  <div class="badge authentic-badge">&#10003; 正品认证</div>
-
-  <div class="info-section">
-    <div class="info-row">
-      <span class="label">订单号</span>
-      <span class="value">{{ order.order_id }}</span>
+<div class="v-page">
+  <!-- Hero section -->
+  <div class="v-hero">
+    <div class="v-brand">
+      <span class="v-brand-gaush">GAUSH</span>
+      <span class="v-brand-sep">|</span>
+      <span class="v-brand-clear">CLEAR</span>
     </div>
-    <div class="info-row">
-      <span class="label">客户姓名</span>
-      <span class="value">{{ order.customer_name }}</span>
+    <div class="v-shield">
+      <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <polyline points="9 12 11 14 15 10"/>
+      </svg>
+    </div>
+    <h1 class="v-status">正品验证通过</h1>
+    <p class="v-product-name">高视星</p>
+    <p class="v-status-sub">该镜片已通过溯源系统认证</p>
+    <!-- Decorative glow -->
+    <div class="v-glow"></div>
+  </div>
+
+  <!-- Main info card -->
+  <div class="v-card">
+    <div class="v-row">
+      <span class="v-label">订单号</span>
+      <span class="v-val v-val-bold">{{ order.order_id }}</span>
+    </div>
+    <div class="v-row">
+      <span class="v-label">客户姓名</span>
+      <span class="v-val">{{ order.customer_name }}</span>
     </div>
     {% if order.production_date %}
-    <div class="info-row">
-      <span class="label">生产日期</span>
-      <span class="value">{{ order.production_date }}</span>
+    <div class="v-row">
+      <span class="v-label">生产日期</span>
+      <span class="v-val">{{ order.production_date }}</span>
+    </div>
+    {% endif %}
+    {% if order.notes %}
+    <div class="v-row">
+      <span class="v-label">备注</span>
+      <span class="v-val">{{ order.notes }}</span>
     </div>
     {% endif %}
   </div>
 
-  <h2 class="section-title">处方参数</h2>
-  <table class="rx-table">
-    <thead>
-      <tr>
-        <th></th>
-        <th>球镜 SPH</th>
-        <th>柱镜 CYL</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="eye-label">左眼 L</td>
-        <td>{{ order.left_sph if order.left_sph else '—' }}</td>
-        <td>{{ order.left_cyl if order.left_cyl else '—' }}</td>
-      </tr>
-      <tr>
-        <td class="eye-label">右眼 R</td>
-        <td>{{ order.right_sph if order.right_sph else '—' }}</td>
-        <td>{{ order.right_cyl if order.right_cyl else '—' }}</td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- Prescription card -->
+  <div class="v-card">
+    <h2 class="v-card-title">
+      <span class="v-card-title-icon">
+        <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="#6c5ce7" stroke-width="1.5"><circle cx="10" cy="10" r="7"/><circle cx="10" cy="10" r="3"/></svg>
+      </span>
+      处方参数
+    </h2>
+    <div class="v-rx">
+      <div class="v-rx-header">
+        <span></span>
+        <span>球镜 SPH</span>
+        <span>柱镜 CYL</span>
+      </div>
+      <div class="v-rx-row">
+        <span class="v-eye-tag v-eye-L">L 左眼</span>
+        <span class="v-rx-num">{{ order.left_sph if order.left_sph else '—' }}</span>
+        <span class="v-rx-num">{{ order.left_cyl if order.left_cyl else '—' }}</span>
+      </div>
+      <div class="v-rx-row">
+        <span class="v-eye-tag v-eye-R">R 右眼</span>
+        <span class="v-rx-num">{{ order.right_sph if order.right_sph else '—' }}</span>
+        <span class="v-rx-num">{{ order.right_cyl if order.right_cyl else '—' }}</span>
+      </div>
+    </div>
+  </div>
 
-  {% if order.notes %}
-  <div class="notes">备注：{{ order.notes }}</div>
-  {% endif %}
-
-  <div class="qr-code-display">镜片码：{{ order.qr_code }}</div>
-  <p class="verify-time">验证时间：{{ now }}</p>
+  <!-- Footer meta -->
+  <div class="v-footer">
+    <p>镜片码&ensp;<span class="v-mono">{{ order.qr_code }}</span></p>
+    <p>验证时间&ensp;{{ now }}</p>
+    <p class="v-footer-brand">GAUSH | CLEAR&ensp;&middot;&ensp;高视星</p>
+  </div>
 </div>
 
 {% else %}
-<div class="verify-card not-found-card">
-  <div class="badge not-found-badge">&#10007; 未找到记录</div>
-  <h1 class="not-found-title">无法验证</h1>
-  <p class="not-found-desc">此二维码未在系统中找到，请联系销售商确认产品真伪。</p>
+<div class="v-page">
+  <div class="v-hero v-hero-fail">
+    <div class="v-brand">
+      <span class="v-brand-gaush">GAUSH</span>
+      <span class="v-brand-sep">|</span>
+      <span class="v-brand-clear">CLEAR</span>
+    </div>
+    <div class="v-shield">
+      <svg viewBox="0 0 24 24" width="48" height="48" fill="none" stroke="#fff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        <line x1="15" y1="9" x2="9" y2="15"/>
+        <line x1="9" y1="9" x2="15" y2="15"/>
+      </svg>
+    </div>
+    <h1 class="v-status">未找到记录</h1>
+    <p class="v-status-sub">此镜片码未在系统中登记<br>请联系销售商确认产品真伪</p>
+    <div class="v-glow"></div>
+  </div>
+  <div class="v-footer">
+    <p class="v-footer-brand">GAUSH | CLEAR&ensp;&middot;&ensp;高视星</p>
+  </div>
 </div>
 {% endif %}
 
