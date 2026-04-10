@@ -1,15 +1,23 @@
 import os
 import io
+import hmac
+import uuid
+import hashlib
+import logging
 import functools
 from datetime import datetime
 from flask import (
     Flask, render_template, redirect, url_for,
-    request, session, send_file, flash, abort,
+    request, session, send_file, flash, abort, jsonify,
 )
 from config import Config
 from utils.excel_reader import load_orders, get_order_by_qr, assign_qr_codes
 from utils.qr_generator import generate_qr_png, generate_all_zip
 from utils.label_generator import generate_factory_zip
+from utils.feishu_api import upload_qr_image, update_order_record
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.secret_key = Config.SECRET_KEY
@@ -206,6 +214,71 @@ def factory_export():
         as_attachment=True,
         download_name="factory_package.zip",
     )
+
+
+# ---------------------------------------------------------------------------
+# Feishu webhook: order confirmed → generate QR → write back to Bitable
+# ---------------------------------------------------------------------------
+#
+# Feishu automation setup (飞书多维表格 → 自动化):
+#   Trigger : 订单状态 field changes to "已确认"
+#   Action  : Send HTTP request
+#     Method : POST
+#     URL    : https://<your-domain>/api/feishu/order_confirmed
+#     Headers: Content-Type: application/json
+#              X-Webhook-Secret: <FEISHU_WEBHOOK_SECRET>
+#     Body   : {
+#                "record_id": "{{record_id}}",
+#                "order_id":  "{{订单号}}",
+#                "patient":   "{{患者姓名}}"
+#              }
+#
+# On success the endpoint:
+#   1. Generates a unique 16-char hex lens code (镜片码)
+#   2. Renders a QR code PNG pointing to /verify/<lens_code>
+#   3. Uploads the PNG to Feishu Drive → gets file_token
+#   4. PATCHes the Bitable record:  镜片码 = lens_code, 二维码图片 = [file_token]
+#   5. Returns {"ok": true, "lens_code": "..."}
+
+@app.route("/api/feishu/order_confirmed", methods=["POST"])
+def feishu_order_confirmed():
+    # 1. Verify shared secret
+    secret = request.headers.get("X-Webhook-Secret", "")
+    expected = Config.FEISHU_WEBHOOK_SECRET
+    if not hmac.compare_digest(secret, expected):
+        logger.warning("Webhook rejected: bad secret")
+        return jsonify({"ok": False, "error": "unauthorized"}), 401
+
+    # 2. Parse body
+    body = request.get_json(silent=True) or {}
+    record_id = body.get("record_id", "").strip()
+    order_id  = body.get("order_id", "").strip()
+    patient   = body.get("patient", "").strip()
+
+    if not record_id or not order_id:
+        return jsonify({"ok": False, "error": "record_id and order_id required"}), 400
+
+    try:
+        # 3. Generate unique lens code
+        lens_code = uuid.uuid4().hex[:16].upper()
+
+        # 4. Render QR PNG (points to public /verify/<lens_code>)
+        png_bytes = generate_qr_png(lens_code, label=order_id, save_to_disk=False)
+
+        # 5. Upload PNG to Feishu Drive
+        filename  = f"{order_id}_{lens_code}.png"
+        file_token = upload_qr_image(png_bytes, filename)
+
+        # 6. Write lens_code + attachment back to the Bitable record
+        update_order_record(record_id, lens_code, file_token)
+
+        logger.info("order_confirmed ok: order=%s lens=%s record=%s",
+                    order_id, lens_code, record_id)
+        return jsonify({"ok": True, "lens_code": lens_code, "order_id": order_id})
+
+    except Exception as exc:
+        logger.exception("order_confirmed failed for order=%s", order_id)
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 if __name__ == "__main__":

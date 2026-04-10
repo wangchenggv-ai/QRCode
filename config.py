@@ -21,3 +21,12 @@ class Config:
     # Upload
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16 MB
     ALLOWED_EXTENSIONS = {"xlsx", "xls"}
+
+    # Feishu integration
+    FEISHU_APP_ID     = os.environ.get("FEISHU_APP_ID", "")
+    FEISHU_APP_SECRET = os.environ.get("FEISHU_APP_SECRET", "")
+    # Shared secret between Feishu automation webhook and this server
+    FEISHU_WEBHOOK_SECRET = os.environ.get("FEISHU_WEBHOOK_SECRET", "change-me")
+    # Bitable where orders live
+    FEISHU_BITABLE_APP_TOKEN = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
+    FEISHU_ORDER_TABLE_ID    = os.environ.get("FEISHU_ORDER_TABLE_ID", "")
