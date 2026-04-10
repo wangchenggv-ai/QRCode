@@ -3,14 +3,14 @@ Feishu API helpers for the QR-code integration.
 
 Responsibilities:
   - Fetch / cache a tenant access token (expires every 2 h)
-  - Upload a PNG bytes object as a Bitable attachment → returns file_token
-  - Patch a Bitable record with the lens code + QR attachment
+  - Poll the order table for confirmed orders that need a lens code
+  - Write lens_code back to the Bitable order record
 """
 
-import io
 import time
 import logging
 import urllib.request
+import urllib.error
 import urllib.parse
 import json
 
@@ -53,74 +53,77 @@ def get_tenant_token() -> str:
 
 
 # ---------------------------------------------------------------------------
-# File upload
+# Poll for pending orders
 # ---------------------------------------------------------------------------
 
-def upload_qr_image(png_bytes: bytes, filename: str) -> str:
+def fetch_pending_orders() -> list[dict]:
     """
-    Upload PNG bytes as a Bitable file attachment.
-    Returns the file_token string to embed in the record update.
+    Return records where 镜片码 is empty (lens code not yet assigned).
+    订单状态 is not visible to the app token, so we assign lens codes to all
+    new orders; actual production is gated by the manual factory export step.
+    Each item: {"record_id": str, "order_id": str, "patient": str}
     """
     token = get_tenant_token()
+    base = Config.FEISHU_BITABLE_APP_TOKEN
+    table = Config.FEISHU_ORDER_TABLE_ID
 
-    # Multipart boundary
-    boundary = "----FeishuQRBoundary"
-    body_parts = []
-
-    def _field(name: str, value: str) -> bytes:
-        return (
-            f"--{boundary}\r\n"
-            f'Content-Disposition: form-data; name="{name}"\r\n\r\n'
-            f"{value}\r\n"
-        ).encode()
-
-    body_parts.append(_field("file_name", filename))
-    body_parts.append(_field("parent_type", "bitable_file"))
-    body_parts.append(_field("parent_node", Config.FEISHU_BITABLE_APP_TOKEN))
-    body_parts.append(_field("size", str(len(png_bytes))))
-
-    # File part
-    body_parts.append((
-        f"--{boundary}\r\n"
-        f'Content-Disposition: form-data; name="file"; filename="{filename}"\r\n'
-        f"Content-Type: image/png\r\n\r\n"
-    ).encode() + png_bytes + b"\r\n")
-
-    body_parts.append(f"--{boundary}--\r\n".encode())
-    body = b"".join(body_parts)
+    url = (
+        f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base}"
+        f"/tables/{table}/records/search"
+    )
+    # Filter only on 镜片码 (visible to app token after re-adding to form).
+    # 订单状态 is not visible to the app token and cannot be used as a filter.
+    payload = json.dumps({
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "镜片码", "operator": "isEmpty", "value": []}
+            ]
+        },
+        "page_size": 50
+    }).encode()
 
     req = urllib.request.Request(
-        "https://open.feishu.cn/open-apis/drive/v1/medias/upload_all",
-        data=body,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": f"multipart/form-data; boundary={boundary}",
-        },
+        url, data=payload,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        data = json.loads(resp.read())
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        logger.error("fetch_pending_orders HTTP %d: %s", e.code, e.read().decode()[:200])
+        return []
 
     if data.get("code") != 0:
-        raise RuntimeError(f"File upload failed: {data}")
+        logger.error("fetch_pending_orders failed: %s", data)
+        return []
 
-    file_token = data["data"]["file_token"]
-    logger.info("Uploaded QR image → file_token=%s", file_token)
-    return file_token
+    pending = []
+    for item in data.get("data", {}).get("items", []):
+        fields = item.get("fields", {})
+        order_id_raw = fields.get("订单编号", "")
+        if isinstance(order_id_raw, list):
+            order_id_raw = order_id_raw[0].get("text", "") if order_id_raw else ""
+        patient_raw = fields.get("患者姓名", "")
+        if isinstance(patient_raw, list):
+            patient_raw = patient_raw[0].get("text", "") if patient_raw else ""
+        pending.append({
+            "record_id": item["record_id"],
+            "order_id":  str(order_id_raw or ""),
+            "patient":   str(patient_raw or ""),
+        })
+
+    logger.info("fetch_pending_orders: %d records need processing", len(pending))
+    return pending
 
 
 # ---------------------------------------------------------------------------
 # Record update
 # ---------------------------------------------------------------------------
 
-def update_order_record(record_id: str, lens_code: str, file_token: str) -> None:
-    """
-    Write lens_code and QR attachment back to the Bitable order record.
-
-    Bitable field names must match exactly what's configured in the table:
-      - '镜片码'     : Text field
-      - '二维码图片' : Attachment field
-    """
+def update_order_record(record_id: str, lens_code: str) -> None:
+    """Write lens_code back to the Bitable order record."""
     token = get_tenant_token()
     url = (
         f"https://open.feishu.cn/open-apis/bitable/v1/apps"
@@ -128,26 +131,18 @@ def update_order_record(record_id: str, lens_code: str, file_token: str) -> None
         f"/tables/{Config.FEISHU_ORDER_TABLE_ID}"
         f"/records/{record_id}"
     )
-    payload = json.dumps({
-        "fields": {
-            "镜片码": lens_code,
-            "二维码图片": [{"file_token": file_token}],
-        }
-    }).encode()
-
+    payload = json.dumps({"fields": {"镜片码": lens_code}}).encode()
     req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Authorization": f"Bearer {token}",
-            "Content-Type": "application/json",
-        },
-        method="PATCH",
+        url, data=payload,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="PUT",
     )
-    with urllib.request.urlopen(req, timeout=10) as resp:
-        data = json.loads(resp.read())
-
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Record update HTTP {e.code}: {body}") from e
     if data.get("code") != 0:
         raise RuntimeError(f"Record update failed: {data}")
-
     logger.info("Record %s updated with lens_code=%s", record_id, lens_code)

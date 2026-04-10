@@ -5,6 +5,8 @@ import uuid
 import hashlib
 import logging
 import functools
+import threading
+import time
 from datetime import datetime
 from flask import (
     Flask, render_template, redirect, url_for,
@@ -14,7 +16,7 @@ from config import Config
 from utils.excel_reader import load_orders, get_order_by_qr, assign_qr_codes
 from utils.qr_generator import generate_qr_png, generate_all_zip
 from utils.label_generator import generate_factory_zip
-from utils.feishu_api import upload_qr_image, update_order_record
+from utils.feishu_api import fetch_pending_orders, update_order_record
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -43,6 +45,39 @@ def _init_sample_data():
         pass
 
 _init_sample_data()
+
+
+# ---------------------------------------------------------------------------
+# Background poller: process confirmed orders every 60 seconds
+# ---------------------------------------------------------------------------
+def _process_one(record: dict) -> None:
+    record_id = record["record_id"]
+    order_id  = record["order_id"] or record_id
+    patient   = record["patient"]
+    lens_code = uuid.uuid4().hex[:16].upper()
+    generate_qr_png(lens_code, label=order_id, save_to_disk=True)
+    update_order_record(record_id, lens_code)
+    logger.info("poller processed: order=%s lens=%s", order_id, lens_code)
+
+
+def _poll_loop() -> None:
+    # Wait for app to fully start
+    time.sleep(10)
+    while True:
+        if Config.FEISHU_APP_ID and Config.FEISHU_BITABLE_APP_TOKEN:
+            try:
+                for record in fetch_pending_orders():
+                    try:
+                        _process_one(record)
+                    except Exception as exc:
+                        logger.error("poller failed for %s: %s", record.get("record_id"), exc)
+            except Exception as exc:
+                logger.error("poller error: %s", exc)
+        time.sleep(60)
+
+
+_poller = threading.Thread(target=_poll_loop, daemon=True, name="feishu-poller")
+_poller.start()
 
 
 @app.context_processor
@@ -262,15 +297,11 @@ def feishu_order_confirmed():
         # 3. Generate unique lens code
         lens_code = uuid.uuid4().hex[:16].upper()
 
-        # 4. Render QR PNG (points to public /verify/<lens_code>)
-        png_bytes = generate_qr_png(lens_code, label=order_id, save_to_disk=False)
+        # 4. Generate QR PNG and save to disk (for production export)
+        generate_qr_png(lens_code, label=order_id, save_to_disk=True)
 
-        # 5. Upload PNG to Feishu Drive
-        filename  = f"{order_id}_{lens_code}.png"
-        file_token = upload_qr_image(png_bytes, filename)
-
-        # 6. Write lens_code + attachment back to the Bitable record
-        update_order_record(record_id, lens_code, file_token)
+        # 5. Write lens_code back to the Bitable record
+        update_order_record(record_id, lens_code)
 
         logger.info("order_confirmed ok: order=%s lens=%s record=%s",
                     order_id, lens_code, record_id)
