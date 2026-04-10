@@ -101,6 +101,8 @@
               {% if order.qr_code %}
               <a href="{{ url_for('generate_single_qr', order_id=oid) }}"
                  class="btn btn-sm">QR</a>
+              <a href="{{ url_for('print_label', order_id=oid) }}"
+                 class="btn btn-sm btn-label">标签</a>
               <a href="{{ url_for('verify', qr_code=order.qr_code) }}"
                  target="_blank" class="btn btn-sm">预览</a>
               {% else %}

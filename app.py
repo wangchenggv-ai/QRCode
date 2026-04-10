@@ -15,7 +15,7 @@ from flask import (
 from config import Config
 from utils.excel_reader import load_orders, get_order_by_qr, assign_qr_codes
 from utils.qr_generator import generate_qr_png, generate_all_zip
-from utils.label_generator import generate_factory_zip
+from utils.label_generator import generate_factory_zip, generate_label_image
 from utils.feishu_api import (
     fetch_pending_orders, update_order_record,
     is_first_order, fetch_overdue_orders, notify, query_orders_for_agent,
@@ -267,6 +267,22 @@ def admin_upload():
 # ---------------------------------------------------------------------------
 # Admin: generate QR codes
 # ---------------------------------------------------------------------------
+@app.route("/admin/print_label/<order_id>")
+@admin_required
+def print_label(order_id):
+    orders = load_orders()
+    order = orders.get(order_id)
+    if order is None or not order.get("qr_code"):
+        abort(404)
+    png = generate_label_image(order)
+    return send_file(
+        io.BytesIO(png),
+        mimetype="image/png",
+        as_attachment=True,
+        download_name=f"label_{order_id}.png",
+    )
+
+
 @app.route("/admin/generate_qr/<order_id>")
 @admin_required
 def generate_single_qr(order_id):
