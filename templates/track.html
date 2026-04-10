@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}高视星 · 订单查询{% endblock %}
+{% block content %}
+
+<div class="v-page">
+  <!-- Header -->
+  <div class="v-hero" style="padding-bottom:1.6rem;">
+    <div class="v-brand">
+      <span class="v-brand-gaush">GAUSH</span>
+      <span class="v-brand-sep">|</span>
+      <span class="v-brand-clear">CLEAR</span>
+    </div>
+    <p class="v-status-sub" style="margin-top:.5rem;">订单状态自助查询</p>
+    <div class="v-glow"></div>
+  </div>
+
+  <!-- Search form -->
+  <div class="v-card">
+    <form method="POST" action="/track">
+      <p style="font-size:.85rem;color:#a0aec0;margin:0 0 .8rem;">
+        输入<strong>订单号</strong>或<strong>联系电话</strong>查询
+      </p>
+      <div style="display:flex;gap:.6rem;">
+        <input
+          type="text"
+          name="query"
+          value="{{ query }}"
+          placeholder="如：ORD-2107 或 138xxxxxxxx"
+          autocomplete="off"
+          style="flex:1;padding:.65rem .9rem;border:1px solid #2d3748;border-radius:8px;
+                 background:#1a202c;color:#e2e8f0;font-size:.95rem;outline:none;"
+        >
+        <button type="submit"
+          style="padding:.65rem 1.2rem;border:none;border-radius:8px;
+                 background:linear-gradient(135deg,#6c5ce7,#a29bfe);
+                 color:#fff;font-size:.95rem;cursor:pointer;white-space:nowrap;">
+          查询
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Results -->
+  {% if searched %}
+    {% if orders %}
+      {% for o in orders %}
+      <div class="v-card">
+        <div class="v-row">
+          <span class="v-label">订单号</span>
+          <span class="v-val v-val-bold">{{ o.order_id }}</span>
+        </div>
+        <div class="v-row">
+          <span class="v-label">患者姓名</span>
+          <span class="v-val">{{ o.patient or '—' }}</span>
+        </div>
+        {% if o.product %}
+        <div class="v-row">
+          <span class="v-label">产品型号</span>
+          <span class="v-val">{{ o.product }}</span>
+        </div>
+        {% endif %}
+        <div class="v-row">
+          <span class="v-label">下单日期</span>
+          <span class="v-val">{{ o.order_date or '—' }}</span>
+        </div>
+        <div class="v-row">
+          <span class="v-label">处理状态</span>
+          <span class="v-val" style="
+            {% if o.lens_code %}color:#68d391;{% else %}color:#f6ad55;{% endif %}
+            font-weight:600;">
+            {{ o.status }}
+          </span>
+        </div>
+        {% if o.lens_code %}
+        <div class="v-row">
+          <span class="v-label">镜片码</span>
+          <span class="v-val v-mono" style="font-size:.85rem;letter-spacing:.05em;">
+            {{ o.lens_code }}
+          </span>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="v-card" style="text-align:center;color:#718096;padding:2rem 1rem;">
+        未找到相关订单，请确认订单号或联系电话是否正确
+      </div>
+    {% endif %}
+  {% endif %}
+
+  <div class="v-footer">
+    <p class="v-footer-brand">GAUSH | CLEAR&ensp;&middot;&ensp;高视星</p>
+  </div>
+</div>
+
+{% endblock %}

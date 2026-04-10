@@ -3,15 +3,19 @@ Feishu API helpers for the QR-code integration.
 
 Responsibilities:
   - Fetch / cache a tenant access token (expires every 2 h)
-  - Poll the order table for confirmed orders that need a lens code
+  - Poll the order table for new orders that need a lens code
+  - Detect first-time orders from an agent
+  - Poll for overdue orders (>= FEISHU_OVERDUE_DAYS days old, lens code assigned)
+  - Send text messages to a group chat or individual user
+  - Look up a Feishu user's open_id by phone number
   - Write lens_code back to the Bitable order record
+  - Query orders by order_id or phone (for agent self-service tracking)
 """
 
 import time
 import logging
 import urllib.request
 import urllib.error
-import urllib.parse
 import json
 
 from config import Config
@@ -53,36 +57,23 @@ def get_tenant_token() -> str:
 
 
 # ---------------------------------------------------------------------------
-# Poll for pending orders
+# Messaging
 # ---------------------------------------------------------------------------
 
-def fetch_pending_orders() -> list[dict]:
-    """
-    Return records where 镜片码 is empty (lens code not yet assigned).
-    订单状态 is not visible to the app token, so we assign lens codes to all
-    new orders; actual production is gated by the manual factory export step.
-    Each item: {"record_id": str, "order_id": str, "patient": str}
-    """
+def send_message(receive_id: str, text: str, receive_id_type: str = "chat_id") -> None:
+    """Send a plain-text message to a Feishu group chat or individual user."""
+    if not receive_id:
+        return
     token = get_tenant_token()
-    base = Config.FEISHU_BITABLE_APP_TOKEN
-    table = Config.FEISHU_ORDER_TABLE_ID
-
-    url = (
-        f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base}"
-        f"/tables/{table}/records/search"
-    )
-    # Filter only on 镜片码 (visible to app token after re-adding to form).
-    # 订单状态 is not visible to the app token and cannot be used as a filter.
     payload = json.dumps({
-        "filter": {
-            "conjunction": "and",
-            "conditions": [
-                {"field_name": "镜片码", "operator": "isEmpty", "value": []}
-            ]
-        },
-        "page_size": 50
+        "receive_id": receive_id,
+        "msg_type": "text",
+        "content": json.dumps({"text": text}),
     }).encode()
-
+    url = (
+        f"https://open.feishu.cn/open-apis/im/v1/messages"
+        f"?receive_id_type={receive_id_type}"
+    )
     req = urllib.request.Request(
         url, data=payload,
         headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
@@ -91,31 +82,228 @@ def fetch_pending_orders() -> list[dict]:
     try:
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read())
+        if data.get("code") != 0:
+            logger.error("send_message failed: %s", data)
+        else:
+            logger.info("Message sent to %s (%s)", receive_id, receive_id_type)
     except urllib.error.HTTPError as e:
-        logger.error("fetch_pending_orders HTTP %d: %s", e.code, e.read().decode()[:200])
-        return []
+        logger.error("send_message HTTP %d: %s", e.code, e.read().decode()[:200])
 
-    if data.get("code") != 0:
-        logger.error("fetch_pending_orders failed: %s", data)
+
+def get_open_id_by_phone(phone: str) -> str | None:
+    """Return the Feishu open_id for a user with the given mobile phone number."""
+    if not phone:
+        return None
+    token = get_tenant_token()
+    payload = json.dumps({"phones": [phone]}).encode()
+    url = (
+        "https://open.feishu.cn/open-apis/contact/v3/users/batch_get_id"
+        "?user_id_type=open_id"
+    )
+    req = urllib.request.Request(
+        url, data=payload,
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+        if data.get("code") != 0:
+            return None
+        for u in data.get("data", {}).get("user_list", []):
+            if u.get("user_id"):
+                return u["user_id"]
+    except Exception as exc:
+        logger.warning("get_open_id_by_phone(%s) failed: %s", phone, exc)
+    return None
+
+
+def notify(text: str, phone: str = "") -> None:
+    """
+    Send text to the configured internal group chat.
+    If phone is provided and a matching Feishu user is found, also DM them.
+    """
+    chat_id = Config.FEISHU_NOTIFY_CHAT_ID
+    if chat_id:
+        send_message(chat_id, text, receive_id_type="chat_id")
+    if phone:
+        open_id = get_open_id_by_phone(phone)
+        if open_id:
+            send_message(open_id, text, receive_id_type="open_id")
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _text(val) -> str:
+    """Extract plain string from a Feishu text/select field value."""
+    if isinstance(val, list) and val:
+        return str(val[0].get("text", "") or val[0].get("name", ""))
+    return str(val or "")
+
+
+def _search(payload: dict) -> list[dict]:
+    """POST to records/search and return items list."""
+    token = get_tenant_token()
+    base  = Config.FEISHU_BITABLE_APP_TOKEN
+    table = Config.FEISHU_ORDER_TABLE_ID
+    url   = (
+        f"https://open.feishu.cn/open-apis/bitable/v1/apps/{base}"
+        f"/tables/{table}/records/search"
+    )
+    req = urllib.request.Request(
+        url, data=json.dumps(payload).encode(),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        logger.error("_search HTTP %d: %s", e.code, e.read().decode()[:200])
         return []
+    if data.get("code") != 0:
+        logger.error("_search failed: %s", data)
+        return []
+    return data.get("data", {}).get("items", [])
+
+
+# ---------------------------------------------------------------------------
+# Poll for pending orders (no lens code yet)
+# ---------------------------------------------------------------------------
+
+def fetch_pending_orders() -> list[dict]:
+    """
+    Return records where 镜片码 is empty (lens code not yet assigned).
+    Each item: {"record_id", "order_id", "patient", "agent", "phone"}
+    """
+    items = _search({
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "镜片码", "operator": "isEmpty", "value": []}
+            ]
+        },
+        "page_size": 50,
+    })
 
     pending = []
-    for item in data.get("data", {}).get("items", []):
-        fields = item.get("fields", {})
-        order_id_raw = fields.get("订单编号", "")
-        if isinstance(order_id_raw, list):
-            order_id_raw = order_id_raw[0].get("text", "") if order_id_raw else ""
-        patient_raw = fields.get("患者姓名", "")
-        if isinstance(patient_raw, list):
-            patient_raw = patient_raw[0].get("text", "") if patient_raw else ""
+    for item in items:
+        f = item.get("fields", {})
         pending.append({
             "record_id": item["record_id"],
-            "order_id":  str(order_id_raw or ""),
-            "patient":   str(patient_raw or ""),
+            "order_id":  _text(f.get("订单编号", "")),
+            "patient":   _text(f.get("患者姓名", "")),
+            "agent":     _text(f.get("代理商名称", "")),
+            "phone":     _text(f.get("联系电话", "")),
         })
 
     logger.info("fetch_pending_orders: %d records need processing", len(pending))
     return pending
+
+
+# ---------------------------------------------------------------------------
+# First-order detection
+# ---------------------------------------------------------------------------
+
+def is_first_order(agent_name: str) -> bool:
+    """Return True if this is the agent's only order in the table."""
+    if not agent_name:
+        return False
+    items = _search({
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "代理商名称", "operator": "is", "value": [agent_name]}
+            ]
+        },
+        "page_size": 2,
+    })
+    return len(items) == 1
+
+
+# ---------------------------------------------------------------------------
+# Overdue orders (lens code assigned, order date > FEISHU_OVERDUE_DAYS ago)
+# ---------------------------------------------------------------------------
+
+def fetch_overdue_orders(overdue_days: int | None = None) -> list[dict]:
+    """
+    Return orders where 镜片码 is assigned but 下单日期 is older than overdue_days.
+    Each item: {"record_id", "order_id", "patient", "agent", "phone", "order_date_ms"}
+    """
+    days = overdue_days if overdue_days is not None else Config.FEISHU_OVERDUE_DAYS
+    threshold_ms = str(int((time.time() - days * 86400) * 1000))
+
+    items = _search({
+        "filter": {
+            "conjunction": "and",
+            "conditions": [
+                {"field_name": "镜片码",  "operator": "isNotEmpty", "value": []},
+                {"field_name": "下单日期", "operator": "isLess",     "value": ["ExactDate", threshold_ms]},
+            ]
+        },
+        "page_size": 50,
+    })
+
+    overdue = []
+    for item in items:
+        f = item.get("fields", {})
+        overdue.append({
+            "record_id":    item["record_id"],
+            "order_id":     _text(f.get("订单编号", "")),
+            "patient":      _text(f.get("患者姓名", "")),
+            "agent":        _text(f.get("代理商名称", "")),
+            "phone":        _text(f.get("联系电话", "")),
+            "order_date_ms": f.get("下单日期", 0),
+        })
+
+    logger.info("fetch_overdue_orders: %d overdue records", len(overdue))
+    return overdue
+
+
+# ---------------------------------------------------------------------------
+# Agent self-service: query orders by order_id or phone
+# ---------------------------------------------------------------------------
+
+def query_orders_for_agent(order_id: str = "", phone: str = "") -> list[dict]:
+    """
+    Return orders matching order_id (exact) or phone (exact).
+    Used for the agent self-service tracking page.
+    """
+    if not order_id and not phone:
+        return []
+
+    conditions = []
+    if order_id:
+        conditions.append({"field_name": "订单编号", "operator": "is", "value": [order_id]})
+    if phone:
+        conditions.append({"field_name": "联系电话", "operator": "is", "value": [phone]})
+
+    items = _search({
+        "filter": {"conjunction": "or", "conditions": conditions},
+        "page_size": 20,
+    })
+
+    results = []
+    for item in items:
+        f = item.get("fields", {})
+        lens = _text(f.get("镜片码", ""))
+        date_ms = f.get("下单日期", 0) or 0
+        order_date = ""
+        if date_ms:
+            import datetime
+            order_date = datetime.datetime.fromtimestamp(date_ms / 1000).strftime("%Y-%m-%d")
+        results.append({
+            "order_id":   _text(f.get("订单编号", "")),
+            "patient":    _text(f.get("患者姓名", "")),
+            "agent":      _text(f.get("代理商名称", "")),
+            "product":    _text(f.get("产品型号", "")),
+            "order_date": order_date,
+            "lens_code":  lens,
+            "status":     "已处理 · 生产中" if lens else "待处理",
+        })
+    return results
 
 
 # ---------------------------------------------------------------------------

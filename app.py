@@ -16,7 +16,10 @@ from config import Config
 from utils.excel_reader import load_orders, get_order_by_qr, assign_qr_codes
 from utils.qr_generator import generate_qr_png, generate_all_zip
 from utils.label_generator import generate_factory_zip
-from utils.feishu_api import fetch_pending_orders, update_order_record
+from utils.feishu_api import (
+    fetch_pending_orders, update_order_record,
+    is_first_order, fetch_overdue_orders, notify, query_orders_for_agent,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,10 +57,52 @@ def _process_one(record: dict) -> None:
     record_id = record["record_id"]
     order_id  = record["order_id"] or record_id
     patient   = record["patient"]
+    agent     = record.get("agent", "")
+    phone     = record.get("phone", "")
+
     lens_code = uuid.uuid4().hex[:16].upper()
     generate_qr_png(lens_code, label=order_id, save_to_disk=True)
     update_order_record(record_id, lens_code)
     logger.info("poller processed: order=%s lens=%s", order_id, lens_code)
+
+    # Feature 1: first-order alert
+    try:
+        if agent and is_first_order(agent):
+            msg = (
+                f"🌟 【首单提醒】\n"
+                f"代理商「{agent}」刚完成首单！\n"
+                f"订单号：{order_id}  患者：{patient}\n"
+                f"请全链条服务团队重点跟进，把首单交付做到极致。"
+            )
+            notify(msg, phone=phone)
+            logger.info("First-order alert sent for agent=%s order=%s", agent, order_id)
+    except Exception as exc:
+        logger.error("First-order check failed for %s: %s", order_id, exc)
+
+
+_alerted_overdue: set = set()   # record_ids already notified this session
+
+
+def _check_overdue() -> None:
+    """Alert on orders older than FEISHU_OVERDUE_DAYS that haven't been notified yet."""
+    try:
+        for rec in fetch_overdue_orders():
+            rid = rec["record_id"]
+            if rid in _alerted_overdue:
+                continue
+            _alerted_overdue.add(rid)
+            days = Config.FEISHU_OVERDUE_DAYS
+            msg = (
+                f"⚠️ 【超期订单提醒 · {days}天未完成】\n"
+                f"订单号：{rec['order_id']}  患者：{rec['patient']}\n"
+                f"代理商：{rec['agent']}  联系电话：{rec['phone']}\n"
+                f"下单日期：{rec.get('order_date_ms', '')}\n"
+                f"请立即跟进交付进度，并主动联系代理商告知情况。"
+            )
+            notify(msg, phone=rec["phone"])
+            logger.info("Overdue alert sent: order=%s agent=%s", rec["order_id"], rec["agent"])
+    except Exception as exc:
+        logger.error("overdue check error: %s", exc)
 
 
 def _poll_loop() -> None:
@@ -65,6 +110,7 @@ def _poll_loop() -> None:
     time.sleep(10)
     while True:
         if Config.FEISHU_APP_ID and Config.FEISHU_BITABLE_APP_TOKEN:
+            # New orders: assign lens codes
             try:
                 for record in fetch_pending_orders():
                     try:
@@ -73,6 +119,8 @@ def _poll_loop() -> None:
                         logger.error("poller failed for %s: %s", record.get("record_id"), exc)
             except Exception as exc:
                 logger.error("poller error: %s", exc)
+            # Overdue orders: alert if needed
+            _check_overdue()
         time.sleep(60)
 
 
@@ -111,6 +159,27 @@ def verify(qr_code):
     if order is None:
         return render_template("verify.html", found=False, qr_code=qr_code), 404
     return render_template("verify.html", found=True, order=order)
+
+
+# ---------------------------------------------------------------------------
+# Agent self-service order tracking
+# ---------------------------------------------------------------------------
+@app.route("/track", methods=["GET", "POST"])
+def track_order():
+    orders = []
+    searched = False
+    query_val = ""
+    if request.method == "POST":
+        query_val = request.form.get("query", "").strip()
+        searched = True
+        if query_val:
+            # Try as order_id; if it looks like a phone number also search by phone
+            is_phone = query_val.lstrip("+").isdigit() and len(query_val) >= 8
+            orders = query_orders_for_agent(
+                order_id="" if is_phone else query_val,
+                phone=query_val if is_phone else "",
+            )
+    return render_template("track.html", orders=orders, searched=searched, query=query_val)
 
 
 # ---------------------------------------------------------------------------

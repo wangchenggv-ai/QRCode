@@ -30,3 +30,7 @@ class Config:
     # Bitable where orders live
     FEISHU_BITABLE_APP_TOKEN = os.environ.get("FEISHU_BITABLE_APP_TOKEN", "")
     FEISHU_ORDER_TABLE_ID    = os.environ.get("FEISHU_ORDER_TABLE_ID", "")
+    # Notifications: internal group chat ID for alerts (oc_xxxxxxxx)
+    FEISHU_NOTIFY_CHAT_ID = os.environ.get("FEISHU_NOTIFY_CHAT_ID", "")
+    # Orders older than this many days trigger an overdue alert
+    FEISHU_OVERDUE_DAYS = int(os.environ.get("FEISHU_OVERDUE_DAYS", "8"))
